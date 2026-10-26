@@ -96,7 +96,7 @@ struct ContentView: View {
                         ContentUnavailableView(
                             "No Recipe Generated",
                             systemImage: "fork.knife.circle",
-                            description: Text("Type or speak any dish name above to let the AI create a custom recipe.")
+                            description: Text("Type or speak any dish name above to let the AI create a custom recipe, or use Siri.")
                         )
                         .padding(.top, 40)
                     }

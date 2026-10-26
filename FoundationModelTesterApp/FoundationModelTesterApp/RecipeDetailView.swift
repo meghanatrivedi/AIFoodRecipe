@@ -51,7 +51,7 @@ struct RecipeDetailView: View {
 
             Divider()
 
-            // Steps
+// Steps
             VStack(alignment: .leading, spacing: 12) {
                 Text("Instructions")
                     .font(.headline)

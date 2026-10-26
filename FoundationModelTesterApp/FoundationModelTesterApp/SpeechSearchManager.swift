@@ -57,7 +57,6 @@ final class SpeechSearchManager: NSObject, SFSpeechRecognizerDelegate {
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         
-        // Safeguard for simulator: check if a valid audio input device / sample rate exists
         guard recordingFormat.sampleRate > 0 && recordingFormat.channelCount > 0 else {
             throw NSError(
                 domain: "SpeechSearchManager",
