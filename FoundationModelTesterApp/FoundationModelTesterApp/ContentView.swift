@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var recipe: Recipe?
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var speechManager = SpeechSearchManager()
     
     // Automatically switch between real AI model and mock based on device capabilities
     private let recipeGenerator: RecipeGenerating = {
@@ -32,10 +33,24 @@ struct ContentView: View {
                         Text("What would you like to cook?")
                             .font(.headline)
                         
-                        HStack {
+                        HStack(spacing: 10) {
                             TextField("e.g., Homemade Pasta Carbonara", text: $dishQuery)
                                 .textFieldStyle(.roundedBorder)
                             
+                            // Speech Search Microphone Button
+                            Button {
+                                handleMicButtonTapped()
+                            } label: {
+                                Image(systemName: speechManager.isRecording ? "mic.fill" : "mic")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(speechManager.isRecording ? .white : .accentColor)
+                                    .frame(width: 36, height: 36)
+                                    .background(speechManager.isRecording ? Color.red : Color(.secondarySystemFill))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(speechManager.isRecording ? "Stop recording" : "Search by voice")
+
                             Button(action: generateRecipe) {
                                 if isLoading {
                                     ProgressView()
@@ -48,6 +63,12 @@ struct ContentView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .disabled(dishQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
+                        }
+                        
+                        if speechManager.isRecording {
+                            Text("Listening... Speak your dish name.")
+                                .font(.caption)
+                                .foregroundColor(.red)
                         }
                         
                         if !SystemLanguageModel.default.isAvailable {
@@ -75,7 +96,7 @@ struct ContentView: View {
                         ContentUnavailableView(
                             "No Recipe Generated",
                             systemImage: "fork.knife.circle",
-                            description: Text("Type any dish name above to let the on-device AI create a custom recipe.")
+                            description: Text("Type or speak any dish name above to let the AI create a custom recipe.")
                         )
                         .padding(.top, 40)
                     }
@@ -84,9 +105,40 @@ struct ContentView: View {
             }
             .navigationTitle("AI Recipe Generator")
         }
+        .onChange(of: speechManager.transcribedText) { oldValue, newValue in
+            if !newValue.isEmpty {
+                dishQuery = newValue
+            }
+        }
+    }
+
+    private func handleMicButtonTapped() {
+        if speechManager.isRecording {
+            speechManager.stopRecording()
+        } else {
+            errorMessage = nil
+            speechManager.requestAuthorization { granted in
+                guard granted else {
+                    errorMessage = "Microphone or Speech Recognition permission denied. Check Settings or Simulator permissions."
+                    return
+                }
+                do {
+                    try speechManager.startRecording { spokenText in
+                        dishQuery = spokenText
+                        generateRecipe()
+                    }
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
     }
 
     private func generateRecipe() {
+        if speechManager.isRecording {
+            speechManager.stopRecording()
+        }
+        
         let query = dishQuery
         isLoading = true
         errorMessage = nil
@@ -108,92 +160,6 @@ struct ContentView: View {
         }
     }
 }
-
-// MARK: - Recipe Detail Subview
-struct RecipeDetailView: View {
-    let recipe: Recipe
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header
-            VStack(alignment: .leading, spacing: 6) {
-                Text(recipe.title)
-                    .font(.title)
-                    .bold()
-                Text(recipe.summary)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-            }
-
-            // Quick Info Badges
-            HStack(spacing: 20) {
-                Label("\(recipe.servings) servings", systemImage: "person.2")
-                Label("\(recipe.prepMinits)m prep", systemImage: "clock")
-                Label("\(recipe.cookMinits)m cook", systemImage: "flame")
-            }
-            .font(.subheadline)
-            .foregroundStyle(.tint)
-
-            Divider()
-
-            // Ingredients
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Ingredients")
-                    .font(.headline)
-                ForEach(Array(recipe.ingredients.enumerated()), id: \.offset) { _, ingredient in
-                    HStack {
-                        Image(systemName: "circle.fill")
-                            .font(.system(size: 6))
-                        Text(ingredient.item)
-                        Spacer()
-                        Text(ingredient.quantity)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            Divider()
-
-            // Steps
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Instructions")
-                    .font(.headline)
-                ForEach(recipe.steps, id: \.stepNumber) { step in
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: step.symbolName)
-                            .frame(width: 24, height: 24)
-                            .foregroundStyle(.tint)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Step \(step.stepNumber)")
-                                .font(.subheadline)
-                                .bold()
-                            Text(step.instruction)
-                                .font(.body)
-                        }
-                    }
-                }
-            }
-
-            // Tips
-            if !recipe.tips.isEmpty {
-                Divider()
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Chef's Tips")
-                        .font(.headline)
-                    ForEach(recipe.tips, id: \.self) { tip in
-                        Label(tip, systemImage: "lightbulb")
-                            .font(.subheadline)
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(radius: 2)
-    }
-}
-
 #Preview {
     ContentView()
 }
